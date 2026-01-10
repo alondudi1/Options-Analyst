@@ -13,7 +13,134 @@ import maof_logic as logic
 import maof_strategies as strategies
 import maof_data as data
 import maof_risk as risk
+import pickle
+import os
 
+# --- 💾 AUTO-LOAD SYSTEM (Protected) ---
+def load_last_state():
+    # נסיון טעינה עטוף בהגנה - מונע קריסה בענן
+    try:
+        # בדיקה כפולה: שהקובץ קיים ושניתן לקרוא ממנו
+        if 'state_loaded' not in st.session_state and os.path.exists('dor_state.pkl'):
+            with open('dor_state.pkl', 'rb') as f:
+                saved_state = pickle.load(f)
+            
+            # שחזור המפתחות לזיכרון
+            for key, val in saved_state.items():
+                st.session_state[key] = val
+                
+            st.session_state['state_loaded'] = True
+            # st.toast("State Restored", icon="💾") 
+    except Exception as e:
+        # במקרה של שגיאה (למשל בענן), נכתוב ללוג הפנימי אך לא נעצור את האפליקציה
+        print(f"⚠️ Auto-load skipped (Cloud/Permission mode): {e}")
+
+# הפעלה
+load_last_state()
+
+# load_last_state() <-- זו השורה הקיימת אצלך
+
+# ==========================================
+# ♻️ STATE RESTORATION (Fix Navigation Loss)
+# ==========================================
+# קוד זה משחזר את נתוני הווידג'טים שנמחקו במעבר בין הדפים
+# הוא משתמש ב-Bridge שכבר בנינו כדי להחזיר את הערכים האחרונים
+if 'dor_bridge' in st.session_state:
+    bridge = st.session_state['dor_bridge']
+    
+    # שחזור ספוט (אם נמחק)
+    if 'spot_price_val' not in st.session_state:
+        st.session_state['spot_price_val'] = float(bridge.get('spot', 3700.0))
+        
+    # שחזור ימים
+    if 'days_to_expiry_val' not in st.session_state:
+        st.session_state['days_to_expiry_val'] = float(bridge.get('days', 30.0))
+        
+    # שחזור IV (המרה חזרה מאחוזים עשרוניים למספר שלם)
+    if 'vol_input' not in st.session_state:
+        st.session_state['vol_input'] = float(bridge.get('iv', 0.14)) * 100.0
+        
+    # שחזור ריבית
+    if 'rate_input' not in st.session_state:
+        st.session_state['rate_input'] = float(bridge.get('rate', 0.04)) * 100.0
+        
+    # שחזור מכפיל
+    if 'multiplier' not in st.session_state:
+        st.session_state['multiplier'] = int(bridge.get('mult', 50))
+
+# --- Page Config ---
+st.set_page_config(layout="wide", page_title="DOR - Derivatives Operation Room")
+
+# --- CSS: עיצוב כרטיסי הניווט ---
+st.markdown("""
+<style>
+    /* עיצוב כרטיסי המעבדה שייראו לחיצים */
+    div[data-testid="stPageLink-NavLink"] {
+        background-color: #0e1117;
+        border: 1px solid #41444c;
+        border-radius: 5px;
+        padding: 10px;
+        transition: 0.3s;
+        text-align: center;
+        margin-bottom: 10px;
+    }
+    div[data-testid="stPageLink-NavLink"]:hover {
+        border-color: #ff4b4b;
+        background-color: rgba(255, 75, 75, 0.1);
+    }
+    div[data-testid="stPageLink-NavLink"] p {
+        font-size: 18px;
+        font-weight: bold;
+        margin: 0;
+    }
+    
+    /* תיקונים כלליים */
+    .stApp { direction: ltr; text-align: left; }
+    .block-container { max_width: 1400px; }
+</style>
+""", unsafe_allow_html=True)
+
+# --- סרגל כלים עליון: ניווט חכם (Smart Navigation) ---
+# אלו הכפתורים ששומרים על הזיכרון! אל תחזיר את ה-HTML הישן.
+
+col_lab1, col_lab2 = st.columns(2, gap="medium")
+
+with col_lab1:
+    st.page_link("pages/1_🧪_OI_Lab.py", label="🧪 OI Lab (תזרים כסף)", use_container_width=True)
+
+with col_lab2:
+    st.page_link("pages/2_🕹️_Path_Lab.py", label="🕹️ Path Lab (סימולטור נתיבים)", use_container_width=True)
+
+st.divider()# --- NAVIGATION DECK: כרטיסי המעבדות ---
+col_oi, col_path = st.columns(2, gap="large")
+
+with col_oi:
+    with st.container(border=True):
+        st.markdown('<p class="lab-card-title">🧪 DOR OI Lab</p>', unsafe_allow_html=True)
+        st.markdown('<p class="lab-card-subtitle">Smart Money Flow & Institutional Tracking</p>', unsafe_allow_html=True)
+        st.page_link("pages/1_🧪_OI_Lab.py", label="Open OI Lab ➜", use_container_width=True)
+
+with col_path:
+    with st.container(border=True):
+        st.markdown('<p class="lab-card-title">🕹️ DOR Path Lab</p>', unsafe_allow_html=True)
+        st.markdown('<p class="lab-card-subtitle">Advanced Scenario Simulation & Stress Testing</p>', unsafe_allow_html=True)
+        st.page_link("pages/2_🕹️_Path_Lab.py", label="Open Path Lab ➜", use_container_width=True)
+
+st.divider()
+
+# --- מכאן והלאה: שאר הקוד המקורי שלך (לוגיקה, הגדרות, AgGrid וכו') ---
+# (ודא שאתה משאיר את כל הלוגיקה של session_state, spot, וכו' כדי שיהיו זמינים למעבדות)
+
+# --- Session State Defaults (חשוב שזה יישאר כדי שהנתונים ישמרו) ---
+DEFAULT_SPOT = 3700.0
+DEFAULT_MULT = 100 # שים לב: שיניתי ל-100 כברירת מחדל אם צריך, או תשאיר 50
+
+if 'spot_price_val' not in st.session_state: st.session_state['spot_price_val'] = DEFAULT_SPOT
+if 'vol_input' not in st.session_state: st.session_state['vol_input'] = 14.0
+if 'rate_input' not in st.session_state: st.session_state['rate_input'] = 4.5
+if 'portfolio_a' not in st.session_state: st.session_state['portfolio_a'] = pd.DataFrame(columns=["Type", "Strike", "Qty", "Option Price"])
+
+# ... המשך הקוד הרגיל שלך של DOR ...
 # --- Page Config ---
 st.set_page_config(layout="wide", page_title="DOR - Derivatives Operation Room")
 
@@ -111,7 +238,7 @@ def get_color_gradient(c1, c2, n):
         colors.append(mcolors.to_hex(rgb))
     return colors
 
-# --- Gap Parsing Logic (RESTORED) ---
+# --- Gap Parsing Logic ---
 def parse_gap_string(gap_str):
     try:
         parts = gap_str.split(':')
@@ -167,13 +294,13 @@ DEFAULT_MULT = 50
 
 if 'spot_price_val' not in st.session_state: st.session_state['spot_price_val'] = DEFAULT_SPOT
 if 'mode' not in st.session_state: st.session_state['mode'] = "Standard (Days)"
-if 'annual_days' not in st.session_state: st.session_state['annual_days'] = 365 
+if 'annual_days' not in st.session_state: st.session_state['annual_days'] = 252 
 if 'expiry_date_val' not in st.session_state: st.session_state['expiry_date_val'] = get_default_expiry()
 if 'days_to_expiry_val' not in st.session_state:
     delta = st.session_state['expiry_date_val'] - date.today()
     st.session_state['days_to_expiry_val'] = max(0, delta.days)
 if 'vol_input' not in st.session_state: st.session_state['vol_input'] = 14.0
-if 'rate_input' not in st.session_state: st.session_state['rate_input'] = 4.25
+if 'rate_input' not in st.session_state: st.session_state['rate_input'] = 4.00
 if 'current_time' not in st.session_state: st.session_state['current_time'] = time(10, 0)
 if 'close_time' not in st.session_state: st.session_state['close_time'] = time(17, 40)
 if 'gap_str' not in st.session_state: st.session_state['gap_str'] = "00:16:20"
@@ -268,7 +395,14 @@ with cols[3]:
     st.selectbox("Days/Year", [365, 252], key='annual_days', label_visibility="collapsed")
 with cols[4]:
     st.markdown("##### ⚙️ Contract")
-    multiplier = st.number_input("Mult", value=DEFAULT_MULT, step=10)
+    # התיקון: הוספנו key='multiplier' כדי שיהיה זמין ב-Path Lab
+   # --- תיקון למניעת אזהרת Multiplier ---
+    # 1. אנו מוודאים שהערך קיים בזיכרון לפני יצירת הווידג'ט
+    if 'multiplier' not in st.session_state:
+        st.session_state['multiplier'] = 50  # ערך ברירת המחדל המקורי
+    
+    # 2. יצירת הווידג'ט ללא הפרמטר value (כי הוא כבר בזיכרון)
+    multiplier = st.number_input("Multiplier", step=10, key='multiplier')
     strike_interval = st.number_input("Interval", value=10, step=5)
     num_strikes = st.number_input("Strikes", value=20, step=2)
 
@@ -319,7 +453,7 @@ with st.expander("🪄 Strategy Wizard", expanded=True):
     def render_cell(container, strat_list, key_suffix):
         with container:
             st.markdown(f"<div class='strategy-card'>", unsafe_allow_html=True)
-            sel = st.selectbox("", strat_list, key=f"sel_{key_suffix}", label_visibility="collapsed")
+            sel = st.selectbox("Select Strategy", strat_list, key=f"sel_{key_suffix}", label_visibility="collapsed")
             if st.button("Load", key=f"btn_{key_suffix}", use_container_width=True):
                 legs = strategies.generate_strategy_legs(sel, calculation_spot, strike_interval)
                 rows = []
@@ -438,7 +572,7 @@ def render_portfolio_editor(key, df_key, color_hex):
     dynamic_key = f"grid_{key}_{st.session_state[f'refresh_key_{key}']}"
     grid_opts = gb_p.build()
     grid_opts['enableRtl'] = False; grid_opts['rowHeight'] = 35; grid_opts['headerHeight'] = 35
-    response = AgGrid(display_df, gridOptions=grid_opts, update_mode=GridUpdateMode.MODEL_CHANGED, height=300, theme='balham', key=dynamic_key, fit_columns_on_grid_load=True, allow_unsafe_jscode=True)
+    response = AgGrid(display_df, gridOptions=grid_opts, update_on=['cellValueChanged'], height=300, theme='balham', key=dynamic_key, fit_columns_on_grid_load=True, allow_unsafe_jscode=True)
     
     res_df = response['data']
     if not res_df.empty:
@@ -506,7 +640,6 @@ if not df_a.empty or not df_b.empty:
             reds = get_color_gradient('#FFA07A', '#8B0000', num_slices)
             greens = get_color_gradient('#90EE90', '#006400', num_slices)
             
-            # Hover Template (Rich HTML)
             custom_hover = "<b>%{text}</b><br>Spot: %{x:,.0f}<br>PnL: %{y:,.0f}₪<extra></extra>"
 
             for i, frac in enumerate(time_fractions):
@@ -544,10 +677,10 @@ if not df_a.empty or not df_b.empty:
             fig_time.add_vline(x=calculation_spot, line_dash="dash", line_color="gray")
             fig_time.add_hline(y=0, line_color="black")
             fig_time.update_layout(title="PnL vs Time Decay", margin=dict(l=10, r=10, t=30, b=10), height=350, hovermode="closest")
-            st.plotly_chart(fig_time, use_container_width=True)
+            st.plotly_chart(fig_time, width="stretch")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- GRAPH 2: IV ---
+    # --- GRAPH 2: IV (SMART INTRADAY MODE) ---
     with st.container():
         st.markdown('<div class="simulation-box">', unsafe_allow_html=True)
         col_g2, col_c2 = st.columns([5, 1], gap="medium")
@@ -556,18 +689,27 @@ if not df_a.empty or not df_b.empty:
             min_iv_u = st.number_input("Min IV", value=8.0, step=1.0)
             max_iv_u = st.number_input("Max IV", value=40.0, step=1.0)
             iv_n = st.number_input("IV Lines", 8, 30, 10)
-            sim_days_passed = st.slider("Days Passed", 0, max(1, int(st.session_state['days_to_expiry_val'])), 0, help="Simulate Time passage")
-            comp_mode_iv = st.radio("Mode:", ["Separate", "Diff"], key="mode_iv")
             
+            # --- INTELLIGENT SLIDER (DAYS vs HOURS) ---
             denom = float(st.session_state.get('annual_days', 365))
             if st.session_state['mode'] == "Standard (Days)":
+                sim_days_passed = st.slider("Days Passed", 0, max(1, int(st.session_state['days_to_expiry_val'])), 0, help="Simulate Time passage")
                 t_sim = max(0.00001, (st.session_state['days_to_expiry_val'] - sim_days_passed) / denom)
-            else: 
-                t_sim = T 
+            else:
+                # In Intraday, we simulate Hours passing, not Days
+                sim_hours_passed = st.slider("Hours Passed", 0.0, float(total_hours), 0.0, step=0.5, help="Simulate Intraday Time passage")
+                # Calculate new T by reducing hours
+                # T represents total annual fraction remaining. We need to subtract the annual fraction of hours passed.
+                hours_annual_fraction = sim_hours_passed / (denom * 24.0)
+                t_sim = max(0.00001, T - hours_annual_fraction)
+
+            comp_mode_iv = st.radio("Mode:", ["Separate", "Diff"], key="mode_iv")
 
         with col_g2:
             fig_iv = go.Figure()
             iv_levels = np.linspace(min_iv_u/100.0, max_iv_u/100.0, iv_n)
+            
+            # --- FIX: PROPER COLOR ARRAYS FOR IV ---
             blues_iv = get_color_gradient('#ADD8E6', '#00008B', iv_n) 
             reds_iv = get_color_gradient('#FFA07A', '#8B0000', iv_n)
             greens_iv = get_color_gradient('#90EE90', '#006400', iv_n)
@@ -580,9 +722,12 @@ if not df_a.empty or not df_b.empty:
                 pnl_b_iv = np.array([calculate_explicit_pnl(df_b, s, t_sim, r, sim_vol, multiplier) for s in spot_range]) if not df_b.empty else np.zeros_like(spot_range)
                 lbl_vol = f"IV {sim_vol*100:.1f}%"
                 if comp_mode_iv == "Separate":
+                    # --- FIX: USING reds_iv[i] (Matching Array Size) ---
                     if not df_a.empty: fig_iv.add_trace(go.Scatter(x=spot_range, y=pnl_a_iv, mode='lines', name=f"A: {lbl_vol}", text=[f"A: {lbl_vol}"]*len(spot_range), hovertemplate=custom_hover_iv, line=dict(color=blues_iv[i], width=width, dash=dash)))
-                    if not df_b.empty: fig_iv.add_trace(go.Scatter(x=spot_range, y=pnl_b_iv, mode='lines', name=f"B: {lbl_vol}", text=[f"B: {lbl_vol}"]*len(spot_range), hovertemplate=custom_hover_iv, line=dict(color=reds[i], width=width, dash=dash)))
-                else: fig_iv.add_trace(go.Scatter(x=spot_range, y=pnl_a_iv-pnl_b_iv, mode='lines', name=f"Diff: {lbl_vol}", text=[f"Diff: {lbl_vol}"]*len(spot_range), hovertemplate=custom_hover_iv, line=dict(color=greens_iv[i], width=width, dash=dash)))
+                    if not df_b.empty: fig_iv.add_trace(go.Scatter(x=spot_range, y=pnl_b_iv, mode='lines', name=f"B: {lbl_vol}", text=[f"B: {lbl_vol}"]*len(spot_range), hovertemplate=custom_hover_iv, line=dict(color=reds_iv[i], width=width, dash=dash)))
+                else: 
+                    # --- FIX: USING greens_iv[i] ---
+                    fig_iv.add_trace(go.Scatter(x=spot_range, y=pnl_a_iv-pnl_b_iv, mode='lines', name=f"Diff: {lbl_vol}", text=[f"Diff: {lbl_vol}"]*len(spot_range), hovertemplate=custom_hover_iv, line=dict(color=greens_iv[i], width=width, dash=dash)))
             
             pnl_a_curr = np.array([calculate_explicit_pnl(df_a, s, t_sim, r, vol, multiplier) for s in spot_range]) if not df_a.empty else np.zeros_like(spot_range)
             pnl_b_curr = np.array([calculate_explicit_pnl(df_b, s, t_sim, r, vol, multiplier) for s in spot_range]) if not df_b.empty else np.zeros_like(spot_range)
@@ -594,8 +739,11 @@ if not df_a.empty or not df_b.empty:
             
             fig_iv.add_vline(x=calculation_spot, line_dash="dash", line_color="gray")
             fig_iv.add_hline(y=0, line_color="black")
-            fig_iv.update_layout(title=f"PnL vs IV Sensitivity (Simulated T-{sim_days_passed}d)", margin=dict(l=10, r=10, t=30, b=10), height=350, hovermode="closest")
-            st.plotly_chart(fig_iv, use_container_width=True)
+            
+            # Dynamic Title based on mode
+            passed_label = f"{sim_days_passed}d" if st.session_state['mode'] == "Standard (Days)" else f"{sim_hours_passed}h"
+            fig_iv.update_layout(title=f"PnL vs IV Sensitivity (Simulated T-{passed_label})", margin=dict(l=10, r=10, t=30, b=10), height=350, hovermode="closest")
+            st.plotly_chart(fig_iv, width="stretch")
         st.markdown('</div>', unsafe_allow_html=True)
 
     # 3D Surface
@@ -611,7 +759,7 @@ if not df_a.empty or not df_b.empty:
             if st.session_state['mode'] == "Intraday (0DTE)":
                 # Show HOURS on axis (0 to Total Hours)
                 y_data = np.linspace(0, total_hours, 25) 
-                y_title = 'Time Passed (Hours)'
+                y_title = 'Time Passed (Hours)' # Changed Title
                 y_fmt = '.1f'
             else:
                 y_data = np.linspace(0, st.session_state['days_to_expiry_val'], 25)
@@ -629,10 +777,8 @@ if not df_a.empty or not df_b.empty:
         
         for i in range(len(y_data)):
             if surface_type == "Spot vs Time":
-                # Calc logic: T_new goes from Full Time -> 0 as Y goes 0 -> Max
                 if st.session_state['mode'] == "Intraday (0DTE)":
                     h_passed = y_data[i]
-                    # Calculate remaining portion
                     pct_left = 1.0 - (h_passed / total_hours)
                     if pct_left < 0: pct_left = 0
                     t_new = T * pct_left
@@ -658,7 +804,7 @@ if not df_a.empty or not df_b.empty:
         yaxis_dict = dict(showgrid=True, title=y_title)
         if tick_fmt: yaxis_dict['tickformat'] = tick_fmt
         fig_3d.update_layout(title=chart_title, scene=dict(xaxis_title='Spot', yaxis_title=y_title, zaxis_title='P&L', xaxis=dict(showgrid=True), yaxis=yaxis_dict, zaxis=dict(showgrid=True)), margin=dict(l=0, r=0, b=0, t=30), height=400, hovermode="closest")
-        st.plotly_chart(fig_3d, use_container_width=True)
+        st.plotly_chart(fig_3d, width="stretch")
 
     # ================= RISK LAB SECTION (VERSION 79.0 - NUMERIC AXES) =================
     st.divider()
@@ -748,7 +894,7 @@ if not df_a.empty or not df_b.empty:
                 fig_mc.add_vline(x=stats_b['VaR_95'], line_dash="dash", line_color="#DC3912", annotation_text="VaR B")
 
             fig_mc.update_layout(barmode='overlay', title="PnL Distribution Overlay", xaxis_title="PnL", height=350)
-            st.plotly_chart(fig_mc, use_container_width=True)
+            st.plotly_chart(fig_mc, width="stretch")
 
         # --- 2. STRESS MATRIX (NUMERIC AXES FIX) ---
         elif risk_mode == "🔥 Stress Matrix":
@@ -809,7 +955,7 @@ if not df_a.empty or not df_b.empty:
                 yaxis=dict(title="IV Change", tickformat=".0%"),
                 height=400
             )
-            st.plotly_chart(fig_stress, use_container_width=True)
+            st.plotly_chart(fig_stress, width="stretch")
 
         # --- 3. HISTORICAL SCENARIOS (GROUPED BAR) ---
         elif risk_mode == "📜 Historical":
@@ -853,7 +999,7 @@ if not df_a.empty or not df_b.empty:
                 fig_hist.update_layout(yaxis=dict(range=[y_min*(1+margin), y_max*(1+margin)]))
 
             fig_hist.update_layout(barmode='group', title="Historical Crisis Comparison", height=400)
-            st.plotly_chart(fig_hist, use_container_width=True)
+            st.plotly_chart(fig_hist, width="stretch")
             
             # --- SCENARIO INSPECTOR (ENGLISH) ---
             st.markdown("#### 🔎 Scenario Inspector")
@@ -875,3 +1021,45 @@ if not df_a.empty or not df_b.empty:
                         st.markdown(f"🏦 Rate: `{s_data['rate_move_pct']*100:+.0f}%`")
 
     st.markdown('</div>', unsafe_allow_html=True)
+
+# ==========================================
+# 🔄 DOR DATA BRIDGE (Save State for Lab)
+# ==========================================
+# קוד זה מבטיח שהנתונים יישמרו גם במעבר דפים
+st.session_state['dor_bridge'] = {
+    'spot': st.session_state.get('spot_price_val', 3700.0),
+    'iv': (st.session_state.get('vol_input', 14.0) or 14.0) / 100.0,
+    'rate': (st.session_state.get('rate_input', 4.0) or 4.0) / 100.0,
+    'days': st.session_state.get('days_to_expiry_val', 30.0),
+    'mult': st.session_state.get('multiplier', 50),
+    'legs': [] # נמלא את זה בנפרד למטה כדי למנוע בעיות
+}
+
+# ==========================================
+# 💾 AUTO-SAVE SYSTEM (Protected)
+# ==========================================
+def save_current_state():
+    # רשימת המפתחות לשמירה
+    keys_to_save = [
+        'spot_price_val', 'vol_input', 'rate_input', 
+        'portfolio_a', 'portfolio_b', 
+        'days_to_expiry_val', 'multiplier', 
+        'mode', 'gap_str'
+    ]
+    
+    state_bundle = {}
+    # איסוף הנתונים הקיימים בלבד
+    for key in keys_to_save:
+        if key in st.session_state:
+            state_bundle[key] = st.session_state[key]
+    
+    # נסיון שמירה מוגן
+    try:
+        with open('dor_state.pkl', 'wb') as f:
+            pickle.dump(state_bundle, f)
+    except Exception as e:
+        # התעלמות אלגנטית אם השמירה נכשלת (נפוץ ב-Streamlit Cloud)
+        print(f"⚠️ Auto-save skipped: {e}")
+
+# ביצוע שמירה
+save_current_state()
